@@ -8,44 +8,46 @@ class anm_asset:
     "A class to represent an asset found at http://ofa.arkib.gov.my"
     def __init__(self, asset_num):
         self.asset_num = asset_num
+        self.page_url = "http://ofa.arkib.gov.my/ofa/group/asset/"+str(asset_num)
+        self.page_file = "./asset_pages/"+str(asset_num)+".html"
         self.props = {}
 
-    def get_props(asset):
-        # init a dictionary for whatever properties we want
-        asset_num = str(asset.asset_num)
-        # set path for the file of the page for this asset 
-        asset_page_file = "./asset_pages/"+str(asset_num)+".html"
-        # make the folder for asset page files if it doesn't exist
+    def download_page(self):
         if not os.path.exists("./asset_pages"):
             print "making asset_pages folder"
             os.makedirs("./asset_pages")
-        # get and save the asset page file if it doesn't exist
-        if not os.path.exists(asset_page_file):
-            asset_page_url = "http://ofa.arkib.gov.my/ofa/group/asset/"+str(asset_num)
-            print "Fetching", asset_page_url 
-            try:
-                asset_page = requests.get(asset_page_url, timeout=30)
-                return asset_page
-            except requests.exceptions.Timeout:
-                print(asset_page_url,'Timed Out!')
-            except requests.exceptions.ConnectionError:
-                print(asset_page_url,'Connection Error!')
-            with open(asset_page_file, "wb") as file:
-                file.write(asset_page.text)
-        # read the asset page file into BS
-        print "Attempting to read", asset_page_file
+        print "Fetching", asset.page_url 
         try:
-            asset_page = BS(open(asset_page_file))
-            # get the URL of the asset PDF
-            iframe_src = asset_page.find('iframe')['src']
-            if "pdf" in iframe_src:
-                asset.props["pdf_url"] = re.search("(?P<url>http?://[^\s]+)", iframe_src).group("url")
-        # get the table with the other properties
-        #table_non = BS(asset_page.find_all('table', {'class' : "non"}))
-        #table_non_rows = table_non.find_all('tr')
-        # COME BACK TO THIS
+            asset_page_response = requests.get(asset.page_url, timeout=30)
+            with open(asset.page_file, "wb") as page:
+                page.write(asset_page_response.text)
+        except requests.exceptions.Timeout:
+            print(asset.page_url,'Timed Out!')
+        except requests.exceptions.ConnectionError:
+            print(asset.page_url,'Connection Error!')
         except:
-            print "Failed to define properties for asset", asset.asset_num
+            print "Could not write", asset.page_file
+
+    def get_props(self):
+        # make the folder for asset page files if it doesn't exist
+        if not os.path.exists(asset.page_file):
+            asset.download_page()
+        # read the asset page file into BS
+        print asset.page_file
+        if os.path.exists(asset.page_file):
+            asset_page = BS(open(asset.page_file))
+            # get the URL of the asset PDF
+            try:
+                asset.props["pdf_url"] = re.search("(?P<url>http?://[^\s]+)", asset_page.find('iframe')['src']).group("url")
+                print "Pdf for asset", asset.asset.num, "is available at", asset.props["pdf_url"]
+            except:
+                print "No PDF info found for asset", asset.asset_num
+            try:
+                key = asset_page.find("legend", text="Butiran Bahan").next_sibling.next_sibling.tr.td.text
+                content = asset_page.find("legend", text="Butiran Bahan").next_sibling.next_sibling.tr.td.next_sibling.next_sibling.next_sibling.next_sibling.text
+                print key, content
+            except:
+                print "No table row text found for", asset.asset_num
         return asset
 
 def get_all_asset_nums(search_url):
