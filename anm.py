@@ -71,28 +71,38 @@ def dedupe(num_list):
     seen_add = seen.add
     return [ x for x in num_list if not (x in seen or seen_add(x))]
 
-search_url = "oil_palm_search.html"
-asset_num_list = get_all_asset_nums(search_url)
-for asset_num in asset_num_list:
-    asset = anm_asset(asset_num)
+def pdf_check(asset):
+    pdf_dest = "./pdf/" + str(asset.asset_num) + ".pdf"
+    if os.path.exists(pdf_dest):
+        print pdf_dest, "already exists"
+    elif 'pdf_url' in asset.props:
+        if os.path.exists("./pdf/" + str(asset.asset_num) + ".pdf"):
+            return True
+        else
+            return False
+
+def download_pdf(asset):            
+        print "Downloading PDF from", asset.props['pdf_url'], "to ./pdf/"+ str(asset.asset_num)+".pdf" 
+        try:
+            rq = urllib2.Request(asset.props['pdf_url'])
+            res = urllib2.urlopen(rq)
+            pdf = open("./pdf/" + str(asset.asset_num) + ".pdf", 'wb')
+            pdf.write(res.read())
+            pdf.close()
+        except:
+            print "Failure to download", pdf_url
+
+def process_search_page(search_url):
+    search_url = "oil_palm_search.html"
+    asset_num_list = get_all_asset_nums(search_url)
+    for asset_num in asset_num_list:
+        asset = anm_asset(asset_num)
     if len(asset.asset_num) > 5:
         asset.get_props()
-        pdf_dest = "./pdf/" + str(asset.asset_num) + ".pdf"
-        if os.path.exists(pdf_dest):
-            print pdf_dest, "already exists"
-        elif 'pdf_url' in asset.props:
-            if not os.path.exists("./pdf/" + str(asset.asset_num) + ".pdf"):
-                print "Downloading PDF from", asset.props['pdf_url'], "to ./pdf/"+ str(asset.asset_num)+".pdf" 
-                try:
-                    rq = urllib2.Request(asset.props['pdf_url'])
-                    res = urllib2.urlopen(rq)
-                    pdf = open("./pdf/" + str(asset.asset_num) + ".pdf", 'wb')
-                    pdf.write(res.read())
-                    pdf.close()
-                except:
-                    print "Failure to download", pdf_url
-            else: 
-                print "./pdf/" + str(asset.asset_num) + ".pdf already exists!"
+        if not pdf_check(asset):
+            download_pdf(asset)
+        else: 
+            print "./pdf/" + str(asset.asset_num) + ".pdf already exists!"
 
 #         self.title = 
 #         # No Penerimaan
