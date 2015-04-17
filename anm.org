@@ -1,0 +1,32 @@
+* What this does so far
+** declare the class anm_asset
+   CLOCK: [2015-04-16 Thu 19:05]--[2015-04-16 Thu 19:34] =>  0:29
+basic framework is done, have to come back to fill it in
+** cUrl to get search page with asset numbers
+** cUrl page for each asset
+** parse each asset page with beautiful soup to get a dictionary of ANM_documents objects
+   CLOCK: [2015-04-16 Thu 21:34]
+   CLOCK: [2015-04-16 Thu 19:34]--[2015-04-16 Thu 20:34] =>  1:00
+#+begin_src python
+import re
+import requests
+from BeautifulSoup import BeautifulSoup as BS
+
+asset_page = BS(open("273929.html"))
+
+iframe_src = asset_page.find('iframe')['src']
+
+pdf_url = re.search("(?P<url>https?://[^\s]+)", iframe_src).group("url")
+
+return pdf_url
+#+end_src
+
+#+RESULTS:
+: http://ofa.arkib.gov.my/lores/hq/digitdoc_10/19570235337d02.pdf
+
+** download PDFs
+* Features to add
+** interactive document search
+** output to CSV
+** output to biblatex 
+** create a sourcelist.json file 
