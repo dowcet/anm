@@ -28,27 +28,42 @@ class anm_asset:
         except:
             print "Could not write", asset.page_file
 
+    def get_pdf_url(self):
+        try:
+            asset.pdf_url = re.search("(?P<url>http?://[^\s]+)", asset_page.find('iframe')['src']).group("url")
+            print "Pdf for asset", asset.asset_num, "is available at", asset.props["pdf_url"]
+        except:
+            print "No PDF info found for asset", asset.asset_num
+
+    def parse_table_data(self):
+        target_keys_list = ['Tajuk', 'Penerimaan', 'Media Asal', 'Sumber', 'Tarikh', 'Jenis Rekod', 'Kategori', 'Subkategori', 'Lokasi']
+        target_keys_dict = {'Tajuk': 'title', 'Penerimaan': 'request_num', 'Media Asal': 'media', 'Sumber': 'source', 'Tarikh': 'date', 'Jenis Rekod': 'rec_type', 'Kategori': 'cat', 'Subkategori': 'subcat', 'Lokasi': 'location'} 
+        table_data = asset.page_soup.find("legend", text="Butiran Bahan").next_sibling.next_sibling.find_all("td")
+        key_found = False
+        for cell in table_data:
+            cell_text = " ".join(cell.text.split())
+            if key_found == False:
+                for key in target_keys_list:
+                    if key_found == False:
+                        if key in cell_text:
+                            new_key = key
+                            key_found = True
+            elif not re.search('^ +', cell_text) and not re.search('^:+', cell_text) and cell_text != "":
+                print target_keys_dict[new_key]+":", cell_text
+                self.props[target_keys_dict[new_key]] = cell_text
+                key_found = False
+
     def get_props(self):
         # make the folder for asset page files if it doesn't exist
         if not os.path.exists(asset.page_file):
             asset.download_page()
         # read the asset page file into BS
-        print asset.page_file
         if os.path.exists(asset.page_file):
-            asset_page = BS(open(asset.page_file))
+            print "reading", asset.page_file
+            self.page_soup = BS(open(asset.page_file))
             # get the URL of the asset PDF
-            try:
-                asset.props["pdf_url"] = re.search("(?P<url>http?://[^\s]+)", asset_page.find('iframe')['src']).group("url")
-                print "Pdf for asset", asset.asset.num, "is available at", asset.props["pdf_url"]
-            except:
-                print "No PDF info found for asset", asset.asset_num
-            try:
-                key = asset_page.find("legend", text="Butiran Bahan").next_sibling.next_sibling.tr.td.text
-                content = asset_page.find("legend", text="Butiran Bahan").next_sibling.next_sibling.tr.td.next_sibling.next_sibling.next_sibling.next_sibling.text
-                print key, content
-            except:
-                print "No table row text found for", asset.asset_num
-        return asset
+        self.pdf_url = asset.get_pdf_url()
+        self.props = asset.parse_table_data()
 
 def get_all_asset_nums(search_url):
     result_list = []
@@ -78,7 +93,7 @@ def pdf_check(asset):
     elif 'pdf_url' in asset.props:
         if os.path.exists("./pdf/" + str(asset.asset_num) + ".pdf"):
             return True
-        else
+        else:
             return False
 
 def download_pdf(asset):            
@@ -93,16 +108,26 @@ def download_pdf(asset):
             print "Failure to download", pdf_url
 
 def process_search_page(search_url):
+    # 1) parse search results 
     search_url = "oil_palm_search.html"
     asset_num_list = get_all_asset_nums(search_url)
+    # 2) declare all asset objects
     for asset_num in asset_num_list:
         asset = anm_asset(asset_num)
+    # 3) get properties of each object, downloading asset page if no local copy is found
     if len(asset.asset_num) > 5:
         asset.get_props()
+        # 4) download pdf if none locally
         if not pdf_check(asset):
             download_pdf(asset)
         else: 
             print "./pdf/" + str(asset.asset_num) + ".pdf already exists!"
+
+# testing get_props
+asset = anm_asset(1000271)
+asset.get_props()
+#for key in asset.props:
+#    print key
 
 #         self.title = 
 #         # No Penerimaan
