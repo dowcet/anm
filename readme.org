@@ -1,0 +1,9 @@
+* Overview
+A tool for scraping metadata for materials at the National Archives of Malaysia (ANM).
+
+Barely tested and under construction, use at your own risk! 
+
+The highest level function at the moment is "dump_from_search", which takes a URL or an html file of search results and outputs a dictionary of metadata for the hits in JSON format. There are some other special features incorporated if you look closely.  
+* Features to add
+** interactive document search
+** output to CSV, biblatex

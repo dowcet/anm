@@ -147,7 +147,6 @@ def process_search_page(search_url):
             print "./pdf/" + str(asset.asset_no) + ".pdf already exists!"
 
 def dump_from_search(search_url):
-    search_url = "oil_palm_search.html"
     asset_no_list = get_all_asset_nos(search_url)
     # a list of dictionaries, each holding the metadata for an asset
     asset_dict= {}
