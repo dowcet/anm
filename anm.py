@@ -131,28 +131,3 @@ asset = anm_asset(1000271)
 asset, props_dict = asset.get_props()
 for key in props_dict:
     print key, props_dict[key]
-
-
-#         self.title = 
-#         # No Penerimaan
-#         self.request_num = 
-#         # Media Asal
-#         self.orig_media = 
-#         # Subjek
-#         self.subject = 
-#         # Sumber
-#         self.source = 
-#         # Tarikh
-#         self.date = 
-#         # Jenis Rekod
-#         self.type = 
-#         # Mukasurat Akses
-#         self.page = 
-#         # Kategori
-#         self.cat = 
-#         # Subkategori
-#         self.subcat = 
-#         # Lokasi
-#         self.location =
-#          URL to download PDF
-#         self.pdf = 
