@@ -14,39 +14,42 @@ class anm_asset:
         self.props = {}
 
     def download_page(self):
-        if not os.path.exists(self.page_file):
-             download_success = False
-             if not os.path.exists("./asset_pages"):
-                 print "making asset_pages folder"
-                 os.makedirs("./asset_pages")
-                 print "Fetching", self.page_url 
+        if os.path.exists(self.page_file):
+            download_success = True
         else:
+            download_success = False
+            if not os.path.exists("./asset_pages"):
+                print "making asset_pages folder"
+                os.makedirs("./asset_pages")
+            print "Fetching", self.page_url 
             try:
                 asset_page_response = requests.get(self.page_url, timeout=30)
                 with open(self.page_file, "wb") as page:
                     page.write(asset_page_response.text)
                 download_success = True
             except requests.exceptions.Timeout:
-                download_success = False
+                #download_success = False
                 print(self.page_url,'Timed Out!')
             except requests.exceptions.ConnectionError:
-                download_success = False
+                #download_success = False
                 print(self.page_url,'Connection Error!')
             except:
-                download_success = False
+                #download_success = False
                 print "Could not write", self.page_file
         return download_success
 
     def get_pdf_url(self):
         try:
             pdf_url = re.search("(?P<url>http?://[^\s]+)", self.page_soup.find('iframe')['src']).group("url")
-            print "Pdf for asset", self.asset_no, "is available at", self.props["pdf_url"]
         except:
             print "No PDF info found for asset", self.asset_no
             pdf_url = ""
+        if not pdf_url == "":
+            print "Pdf for asset", self.asset_no, "is available at", self.props["pdf_url"]
         return pdf_url
 
     def parse_table_data(self):
+        #print "Parsing table data..."
         props_dict = {}
         target_keys_list = ['Tajuk', 'Penerimaan', 'Media Asal', 'Sumber', 'Tarikh', 'Jenis Rekod', 'Kategori', 'Subkategori', 'Lokasi']
         target_keys_dict = {'Tajuk': 'title', 'Penerimaan': 'request_num', 'Media Asal': 'media', 'Sumber': 'source', 'Tarikh': 'date', 'Jenis Rekod': 'rec_type', 'Kategori': 'cat', 'Subkategori': 'subcat', 'Lokasi': 'location'}
@@ -69,20 +72,22 @@ class anm_asset:
         return props_dict
 
     def get_props(self):
+        #print "getting properties..."
         # make sure we have the file, download if needed
         downloaded = self.download_page()
         # read the asset page file into BS
         if downloaded and os.path.exists(self.page_file):
             print "reading", self.page_file
             self.page_soup = BS(open(self.page_file))
-            # get the URL of the asset PDF
-        if downloaded:
-            props_dict = self.parse_table_data()
-        props_dict["asset_no"] = self.asset_no
-        props_dict["pdf_url"] = self.get_pdf_url()
+            try:
+                props_dict = self.parse_table_data()
+            except:
+                print "could not parse table data!"
+                props_dict = "fail!"
         return props_dict
 
 def get_all_asset_nos(search_url):
+    print "getting list of asset numbers"
     result_list = []
     asset_list = []
     if not "http://" in search_url:
@@ -153,4 +158,4 @@ for asset_no in asset_no_list:
     temp_dict = temp_asset.get_props() 
     asset_dict_list.append(temp_dict)
 with open('assets.json', 'w') as dumpfile:    
-    json.dump(asset_list, dumpfile)
+    json.dump(asset_dict_list, dumpfile)
