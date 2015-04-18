@@ -85,6 +85,8 @@ class anm_asset:
                 props_dict = "fail!"
         return props_dict
 
+### end of class "anm_asset" ###
+
 def get_all_asset_nos(search_url):
     print "getting list of asset numbers"
     result_list = []
@@ -157,4 +159,3 @@ def dump_from_search(search_url):
         asset_dict[asset_no] = temp_dict
     with open('assets.json', 'w') as dumpfile:    
         json.dump(asset_dict, dumpfile)
-
