@@ -42,10 +42,10 @@ class anm_asset:
         try:
             pdf_url = re.search("(?P<url>http?://[^\s]+)", self.page_soup.find('iframe')['src']).group("url")
         except:
-            print "No PDF info found for asset", self.asset_no
+            #print "No PDF info found for asset", self.asset_no
             pdf_url = ""
         if not pdf_url == "":
-            print "Pdf for asset", self.asset_no, "is available at", self.props["pdf_url"]
+            print "Pdf for asset", self.asset_no, "is available at", pdf_url
         return pdf_url
 
     def parse_table_data(self):
@@ -68,7 +68,6 @@ class anm_asset:
                 props_dict[target_keys_dict[new_key]] = cell_text
                 key_found = False
         props_dict["pdf_url"] = self.get_pdf_url()
-        props_dict["asset_no"] = self.asset_no
         return props_dict
 
     def get_props(self):
@@ -145,17 +144,17 @@ def process_search_page(search_url):
         else: 
             print "./pdf/" + str(asset.asset_no) + ".pdf already exists!"
 
-# testing json_dump
+def dump_from_search(search_url):
+    search_url = "oil_palm_search.html"
+    asset_no_list = get_all_asset_nos(search_url)
+    # a list of dictionaries, each holding the metadata for an asset
+    asset_dict= {}
+    with open('assets.json', 'w') as outfile: 
+        json.dump([], outfile)
+    for asset_no in asset_no_list:
+        temp_asset = anm_asset(asset_no)
+        temp_dict = temp_asset.get_props() 
+        asset_dict[asset_no] = temp_dict
+    with open('assets.json', 'w') as dumpfile:    
+        json.dump(asset_dict, dumpfile)
 
-search_url = "oil_palm_search.html"
-asset_no_list = get_all_asset_nos(search_url)
-# a list of dictionaries, each holding the metadata for an asset
-asset_dict_list = []
-with open('assets.json', 'w') as outfile: 
-    json.dump([], outfile)
-for asset_no in asset_no_list:
-    temp_asset = anm_asset(asset_no)
-    temp_dict = temp_asset.get_props() 
-    asset_dict_list.append(temp_dict)
-with open('assets.json', 'w') as dumpfile:    
-    json.dump(asset_dict_list, dumpfile)
