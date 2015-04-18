@@ -36,6 +36,7 @@ class anm_asset:
             print "No PDF info found for asset", asset.asset_num
 
     def parse_table_data(self):
+        props_dict = {}
         target_keys_list = ['Tajuk', 'Penerimaan', 'Media Asal', 'Sumber', 'Tarikh', 'Jenis Rekod', 'Kategori', 'Subkategori', 'Lokasi']
         target_keys_dict = {'Tajuk': 'title', 'Penerimaan': 'request_num', 'Media Asal': 'media', 'Sumber': 'source', 'Tarikh': 'date', 'Jenis Rekod': 'rec_type', 'Kategori': 'cat', 'Subkategori': 'subcat', 'Lokasi': 'location'} 
         table_data = asset.page_soup.find("legend", text="Butiran Bahan").next_sibling.next_sibling.find_all("td")
@@ -49,9 +50,10 @@ class anm_asset:
                             new_key = key
                             key_found = True
             elif not re.search('^ +', cell_text) and not re.search('^:+', cell_text) and cell_text != "":
-                print target_keys_dict[new_key]+":", cell_text
-                self.props[target_keys_dict[new_key]] = cell_text
+                #print target_keys_dict[new_key]+":", cell_text
+                props_dict[target_keys_dict[new_key]] = cell_text
                 key_found = False
+        return props_dict
 
     def get_props(self):
         # make the folder for asset page files if it doesn't exist
@@ -63,7 +65,8 @@ class anm_asset:
             self.page_soup = BS(open(asset.page_file))
             # get the URL of the asset PDF
         self.pdf_url = asset.get_pdf_url()
-        self.props = asset.parse_table_data()
+        props_dict = asset.parse_table_data()
+        return self, props_dict
 
 def get_all_asset_nums(search_url):
     result_list = []
@@ -125,9 +128,10 @@ def process_search_page(search_url):
 
 # testing get_props
 asset = anm_asset(1000271)
-asset.get_props()
-#for key in asset.props:
-#    print key
+asset, props_dict = asset.get_props()
+for key in props_dict:
+    print key, props_dict[key]
+
 
 #         self.title = 
 #         # No Penerimaan
