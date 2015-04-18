@@ -2,44 +2,55 @@ import os
 import re
 import urllib2
 import requests
+import json
 from bs4 import BeautifulSoup as BS
 
 class anm_asset:
     "A class to represent an asset found at http://ofa.arkib.gov.my"
-    def __init__(self, asset_num):
-        self.asset_num = asset_num
-        self.page_url = "http://ofa.arkib.gov.my/ofa/group/asset/"+str(asset_num)
-        self.page_file = "./asset_pages/"+str(asset_num)+".html"
+    def __init__(self, asset_no):
+        self.asset_no = asset_no
+        self.page_url = "http://ofa.arkib.gov.my/ofa/group/asset/"+str(asset_no)
+        self.page_file = "./asset_pages/"+str(asset_no)+".html"
         self.props = {}
 
     def download_page(self):
-        if not os.path.exists("./asset_pages"):
-            print "making asset_pages folder"
-            os.makedirs("./asset_pages")
-        print "Fetching", asset.page_url 
-        try:
-            asset_page_response = requests.get(asset.page_url, timeout=30)
-            with open(asset.page_file, "wb") as page:
-                page.write(asset_page_response.text)
-        except requests.exceptions.Timeout:
-            print(asset.page_url,'Timed Out!')
-        except requests.exceptions.ConnectionError:
-            print(asset.page_url,'Connection Error!')
-        except:
-            print "Could not write", asset.page_file
+        if not os.path.exists(self.page_file):
+             download_success = False
+             if not os.path.exists("./asset_pages"):
+                 print "making asset_pages folder"
+                 os.makedirs("./asset_pages")
+                 print "Fetching", self.page_url 
+        else:
+            try:
+                asset_page_response = requests.get(self.page_url, timeout=30)
+                with open(self.page_file, "wb") as page:
+                    page.write(asset_page_response.text)
+                download_success = True
+            except requests.exceptions.Timeout:
+                download_success = False
+                print(self.page_url,'Timed Out!')
+            except requests.exceptions.ConnectionError:
+                download_success = False
+                print(self.page_url,'Connection Error!')
+            except:
+                download_success = False
+                print "Could not write", self.page_file
+        return download_success
 
     def get_pdf_url(self):
         try:
-            asset.pdf_url = re.search("(?P<url>http?://[^\s]+)", asset_page.find('iframe')['src']).group("url")
-            print "Pdf for asset", asset.asset_num, "is available at", asset.props["pdf_url"]
+            pdf_url = re.search("(?P<url>http?://[^\s]+)", self.page_soup.find('iframe')['src']).group("url")
+            print "Pdf for asset", self.asset_no, "is available at", self.props["pdf_url"]
         except:
-            print "No PDF info found for asset", asset.asset_num
+            print "No PDF info found for asset", self.asset_no
+            pdf_url = ""
+        return pdf_url
 
     def parse_table_data(self):
         props_dict = {}
         target_keys_list = ['Tajuk', 'Penerimaan', 'Media Asal', 'Sumber', 'Tarikh', 'Jenis Rekod', 'Kategori', 'Subkategori', 'Lokasi']
-        target_keys_dict = {'Tajuk': 'title', 'Penerimaan': 'request_num', 'Media Asal': 'media', 'Sumber': 'source', 'Tarikh': 'date', 'Jenis Rekod': 'rec_type', 'Kategori': 'cat', 'Subkategori': 'subcat', 'Lokasi': 'location'} 
-        table_data = asset.page_soup.find("legend", text="Butiran Bahan").next_sibling.next_sibling.find_all("td")
+        target_keys_dict = {'Tajuk': 'title', 'Penerimaan': 'request_num', 'Media Asal': 'media', 'Sumber': 'source', 'Tarikh': 'date', 'Jenis Rekod': 'rec_type', 'Kategori': 'cat', 'Subkategori': 'subcat', 'Lokasi': 'location'}
+        table_data = self.page_soup.find("legend", text="Butiran Bahan").next_sibling.next_sibling.find_all("td")
         key_found = False
         for cell in table_data:
             cell_text = " ".join(cell.text.split())
@@ -53,22 +64,25 @@ class anm_asset:
                 #print target_keys_dict[new_key]+":", cell_text
                 props_dict[target_keys_dict[new_key]] = cell_text
                 key_found = False
+        props_dict["pdf_url"] = self.get_pdf_url()
+        props_dict["asset_no"] = self.asset_no
         return props_dict
 
     def get_props(self):
-        # make the folder for asset page files if it doesn't exist
-        if not os.path.exists(asset.page_file):
-            asset.download_page()
+        # make sure we have the file, download if needed
+        downloaded = self.download_page()
         # read the asset page file into BS
-        if os.path.exists(asset.page_file):
-            print "reading", asset.page_file
-            self.page_soup = BS(open(asset.page_file))
+        if downloaded and os.path.exists(self.page_file):
+            print "reading", self.page_file
+            self.page_soup = BS(open(self.page_file))
             # get the URL of the asset PDF
-        self.pdf_url = asset.get_pdf_url()
-        props_dict = asset.parse_table_data()
-        return self, props_dict
+        if downloaded:
+            props_dict = self.parse_table_data()
+        props_dict["asset_no"] = self.asset_no
+        props_dict["pdf_url"] = self.get_pdf_url()
+        return props_dict
 
-def get_all_asset_nums(search_url):
+def get_all_asset_nos(search_url):
     result_list = []
     asset_list = []
     if not "http://" in search_url:
@@ -90,21 +104,21 @@ def dedupe(num_list):
     return [ x for x in num_list if not (x in seen or seen_add(x))]
 
 def pdf_check(asset):
-    pdf_dest = "./pdf/" + str(asset.asset_num) + ".pdf"
+    pdf_dest = "./pdf/" + str(asset.asset_no) + ".pdf"
     if os.path.exists(pdf_dest):
         print pdf_dest, "already exists"
     elif 'pdf_url' in asset.props:
-        if os.path.exists("./pdf/" + str(asset.asset_num) + ".pdf"):
+        if os.path.exists("./pdf/" + str(asset.asset_no) + ".pdf"):
             return True
         else:
             return False
 
 def download_pdf(asset):            
-        print "Downloading PDF from", asset.props['pdf_url'], "to ./pdf/"+ str(asset.asset_num)+".pdf" 
+        print "Downloading PDF from", asset.props['pdf_url'], "to ./pdf/"+ str(asset.asset_no)+".pdf" 
         try:
             rq = urllib2.Request(asset.props['pdf_url'])
             res = urllib2.urlopen(rq)
-            pdf = open("./pdf/" + str(asset.asset_num) + ".pdf", 'wb')
+            pdf = open("./pdf/" + str(asset.asset_no) + ".pdf", 'wb')
             pdf.write(res.read())
             pdf.close()
         except:
@@ -113,21 +127,30 @@ def download_pdf(asset):
 def process_search_page(search_url):
     # 1) parse search results 
     search_url = "oil_palm_search.html"
-    asset_num_list = get_all_asset_nums(search_url)
+    asset_no_list = get_all_asset_nos(search_url)
     # 2) declare all asset objects
-    for asset_num in asset_num_list:
-        asset = anm_asset(asset_num)
+    for asset_no in asset_no_list:
+        asset = anm_asset(asset_no)
     # 3) get properties of each object, downloading asset page if no local copy is found
-    if len(asset.asset_num) > 5:
+    if len(asset.asset_no) > 5:
         asset.get_props()
         # 4) download pdf if none locally
         if not pdf_check(asset):
             download_pdf(asset)
         else: 
-            print "./pdf/" + str(asset.asset_num) + ".pdf already exists!"
+            print "./pdf/" + str(asset.asset_no) + ".pdf already exists!"
 
-# testing get_props
-asset = anm_asset(1000271)
-asset, props_dict = asset.get_props()
-for key in props_dict:
-    print key, props_dict[key]
+# testing json_dump
+
+search_url = "oil_palm_search.html"
+asset_no_list = get_all_asset_nos(search_url)
+# a list of dictionaries, each holding the metadata for an asset
+asset_dict_list = []
+with open('assets.json', 'w') as outfile: 
+    json.dump([], outfile)
+for asset_no in asset_no_list:
+    temp_asset = anm_asset(asset_no)
+    temp_dict = temp_asset.get_props() 
+    asset_dict_list.append(temp_dict)
+with open('assets.json', 'w') as dumpfile:    
+    json.dump(asset_list, dumpfile)
