@@ -13,6 +13,8 @@ class anm_asset:
         self.page_file = "./asset_pages/"+str(asset_no)+".html"
         self.props = {}
 
+### start methods of anm_asset ###
+
     def download_page(self):
         if os.path.exists(self.page_file):
             download_success = True
@@ -85,7 +87,7 @@ class anm_asset:
                 props_dict = "fail!"
         return props_dict
 
-### end of class "anm_asset" ###
+### end methods of anm_asset ###
 
 def get_all_asset_nos(search_url):
     print "getting list of asset numbers"
@@ -103,7 +105,8 @@ def get_all_asset_nos(search_url):
             asset_list.append(result_nums[0])
     return sorted(dedupe(asset_list))
 
-# fastest according to  http://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-python-whilst-preserving-order
+# I should figure out why the duplicates are happening, but for now...
+# fastest way to remove duplicates from a list according to  http://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-python-whilst-preserving-order
 def dedupe(num_list):
     seen = set()
     seen_add = seen.add
