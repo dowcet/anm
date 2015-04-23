@@ -1,4 +1,5 @@
-# attempting to translate json output into a CSV
+# this converts the json output of anm.py to a csv file
+# eventually anm.py should offer options of json, csv and biblatex
 
 import simplejson
 import csv
@@ -18,7 +19,8 @@ with open('/home/dowcet/python/anm/oil_palm.csv', 'w') as outfile:
             writer = csv.DictWriter(outfile, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
             writer.writeheader()
         try:
-           writer.writerow(data[asset])
+            data[asset]["asset_no"] = asset
+            writer.writerow(data[asset])
         except:
-           failures = failures+1
-return failures, fieldnames
+            print asset, "failed!"
+
