@@ -23,4 +23,3 @@ with open('/home/dowcet/python/anm/oil_palm.csv', 'w') as outfile:
             writer.writerow(data[asset])
         except:
             print asset, "failed!"
-

@@ -45,30 +45,33 @@ class anm_asset:
             pdf_url = re.search("(?P<url>http?://[^\s]+)", self.page_soup.find('iframe')['src']).group("url")
         except:
             #print "No PDF info found for asset", self.asset_no
-            pdf_url = ""
-        if not pdf_url == "":
+            pdf_url = "Not Found"
+        if not pdf_url == "Not Found":
             print "Pdf for asset", self.asset_no, "is available at", pdf_url
         return pdf_url
 
     def parse_table_data(self):
         #print "Parsing table data..."
         props_dict = {}
-        target_keys_list = ['Tajuk', 'Penerimaan', 'Media Asal', 'Sumber', 'Tarikh', 'Jenis Rekod', 'Kategori', 'Subkategori', 'Lokasi']
-        target_keys_dict = {'Tajuk': 'title', 'Penerimaan': 'request_num', 'Media Asal': 'media', 'Sumber': 'source', 'Tarikh': 'date', 'Jenis Rekod': 'rec_type', 'Kategori': 'cat', 'Subkategori': 'subcat', 'Lokasi': 'location'}
+        #target_keys_list = ['Tajuk', 'Penerimaan', 'Media Asal', 'Sumber', 'Tarikh', 'Jenis Rekod', 'Kategori', 'Subkategori', 'Lokasi']
+        target_keys_dict = {'Tajuk': 'title', 'No Penerimaan': 'request_num', 'Media Asal': 'media', 'Sumber': 'source', 'Tarikh': 'date', 'Jenis Rekod': 'rec_type', 'Kategori': 'cat', 'Subkategori': 'subcat', 'Lokasi': 'location', 'Deskripsi': 'description', 'Subjek': 'subject', 'Mukasurat Akses': 'access_page', 'Hit' : 'hits'}
         table_data = self.page_soup.find("legend", text="Butiran Bahan").next_sibling.next_sibling.find_all("td")
-        key_found = False
+        # get a clean list of results 
+        hit_list = []
         for cell in table_data:
             cell_text = " ".join(cell.text.split())
-            if key_found == False:
-                for key in target_keys_list:
-                    if key_found == False:
-                        if key in cell_text:
-                            new_key = key
-                            key_found = True
-            elif not re.search('^ +', cell_text) and not re.search('^:+', cell_text) and cell_text != "":
-                #print target_keys_dict[new_key]+":", cell_text
-                props_dict[target_keys_dict[new_key]] = cell_text
-                key_found = False
+            if cell_text == '':
+                cell_text = "Not Found"
+            if cell_text != ":":
+                hit_list.append(cell_text)
+        # make a dictionary from the cleaned list
+        count = 0
+        for hit in hit_list:
+            count = count + 1
+            if count % 2 != 0:
+                new_key = hit
+            else:
+                props_dict[target_keys_dict[new_key]] = hit
         props_dict["pdf_url"] = self.get_pdf_url()
         return props_dict
 
