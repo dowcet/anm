@@ -10,6 +10,17 @@ The most useful function at the moment is "dump_search_to_csv". To use it:
 3) Call dump_search_to_csv("result.html")   
 
 This will download the pages for each asset in your search results and parse their metadata to a spreadsheet, "assets.csv". 
-* Features to add
-** interactive document search
-** output to biblatex
+* plan for v1
+- default behavior of main routine
+  - expect a search string, ask if none provided
+  - do a search
+  - d/l the search results to a local file, name based on search string
+  - d/l all asset pages to a local directory, name based on search string + assets
+  - d/l any PDFs to a local directory
+- what optional arguments do we want?
+  - no search, process a local search file
+  - no search, process a local directory of asset files
+  - no d/l, fetch to memory and write to csv
+  - don't fetch pdfs 
+  - do not make csv
+  - input a different file name

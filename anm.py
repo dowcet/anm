@@ -11,6 +11,7 @@ class anm_asset:
         self.asset_no = asset_no
         self.page_url = "http://ofa.arkib.gov.my/ofa/group/asset/"+str(asset_no)
         self.page_file = "./asset_pages/"+str(asset_no)+".html"
+        # Currently using this dictionary for pdf_url only because I haven't figure out how to iterate a dictionary when it is an attribute 
         self.props = {}
 
 ### start methods of anm_asset ###
@@ -171,11 +172,14 @@ def dump_search_to_csv(search_url):
         writer = csv.DictWriter(outfile, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
         writer.writeheader()
         # 2) now add each asset to the csv file
-        print "reading", len(asset_no_list), "asset files..."
+        print "Looking for", len(asset_no_list), "assets..."
         for asset_no in asset_no_list:
             # get props for asset
             temp_asset = anm_asset(asset_no)
             temp_prop_dict = temp_asset.get_props()
+            # next two lines didn't work, need to find out why
+            #if 'pdf_url' in temp_asset.props and not pdf_check(temp_asset):
+               # download_pdf(temp_asset)
             # include asset_no to dict
             if "failure" in temp_prop_dict:
                 print "skipping asset", asset_no+":", temp_prop_dict["failure"]
