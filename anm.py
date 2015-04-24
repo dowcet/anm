@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+
+import argparse
 import os
 import re
 import urllib2
@@ -76,7 +79,7 @@ class anm_asset:
         props_dict["pdf_url"] = self.get_pdf_url()
         return props_dict
 
-    def get_props(self):
+    def get_props(self, args):
         props_dict = {}
         #print "getting properties..."
         # make sure we have the file, download if needed
@@ -97,28 +100,6 @@ class anm_asset:
 
 ### end methods of anm_asset ###
 
-def get_all_asset_nos(search_url):
-    print "getting list of asset numbers"
-    result_list = []
-    asset_list = []
-    if not "http://" in search_url:
-        search_page = open(search_url)
-    else:
-        search_page = requests.get(search_url)
-    search_page = BS(search_page)
-    hrefs = search_page.find_all(href=re.compile("asset"))
-    for result in hrefs:
-        result_nums = re.findall(r'\d+', str(result))
-        if len(result_nums[0]) > 4:
-            asset_list.append(result_nums[0])
-    return sorted(dedupe(asset_list))
-
-# I should figure out why the duplicates are happening, but for now...
-# fastest way to remove duplicates from a list according to  http://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-python-whilst-preserving-order
-def dedupe(num_list):
-    seen = set()
-    seen_add = seen.add
-    return [ x for x in num_list if not (x in seen or seen_add(x))]
 
 def pdf_check(asset):
     pdf_dest = "./pdf/" + str(asset.asset_no) + ".pdf"
@@ -141,24 +122,8 @@ def download_pdf(asset):
         except:
             print "Failure to download", pdf_url
 
-def process_search_page(search_url):
-    # 1) parse search results 
-    search_url = "oil_palm_search.html"
-    asset_no_list = get_all_asset_nos(search_url)
-    # 2) declare all asset objects
-    for asset_no in asset_no_list:
-        asset = anm_asset(asset_no)
-    # 3) get properties of each object, downloading asset page if no local copy is found
-    if len(asset.asset_no) > 5:
-        asset.get_props()
-        # 4) download pdf if none locally
-        if not pdf_check(asset):
-            download_pdf(asset)
-        else: 
-            print "./pdf/" + str(asset.asset_no) + ".pdf already exists!"
-
-def dump_search_to_csv(search_url):
-    asset_no_list = get_all_asset_nos(search_url)
+def dump_search_to_csv(search_file_name):
+    asset_no_list = parse_search_page(search_file_name)
     with open('assets.csv', 'w') as outfile:
         # 1) first write the column headings
         # 1.a) this is not a good way to do this, but for a quick fix I am pasting the following dict from above 
@@ -189,3 +154,137 @@ def dump_search_to_csv(search_url):
                     writer.writerow(temp_prop_dict)
                 except:
                     raise # was: print asset_no, "failed!"
+
+def busted_parse_search_page(search_file, args):
+    # 1) parse search results 
+    asset_no_list = parse_search_results(search_file, args)
+    # 2) declare all asset objects
+    for asset_no in asset_no_list:
+        asset = anm_asset(asset_no, args)
+    # 3) get properties of each object, downloading asset page if no local copy is found
+    if len(asset.asset_no) > 5:
+        asset.get_props(args)
+        # 4) download pdf if none locally
+        if not pdf_check(asset) and not args.local:
+            download_pdf(asset)
+        else: 
+            print "./pdf/" + str(asset.asset_no) + ".pdf already exists!"
+
+#def fetch_search(search_string):
+
+# I should figure out why the duplicates are happening, but for now...
+# fastest way to remove duplicates from a list according to  http://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-python-whilst-preserving-order
+def dedupe(num_list):
+    seen = set()
+    seen_add = seen.add
+    return [ x for x in num_list if not (x in seen or seen_add(x))]
+
+def download_asset_page(asset):
+    if os.path.exists(asset.page_file):
+        download_success = True
+    else:
+        download_success = False
+        if not os.path.exists("./asset_pages"):
+            print "making asset_pages folder"
+            os.makedirs("./asset_pages")
+        print "Fetching", asset.page_url 
+        try:
+            asset_page_response = requests.get(asset.page_url, timeout=30)
+            with open(asset.page_file, "wb") as page:
+                page.write(asset_page_response.text)
+                download_success = True
+        except requests.exceptions.Timeout:
+            #download_success = False
+            print(asset.page_url,'Timed Out!')
+        except requests.exceptions.ConnectionError:
+            #download_success = False
+            print(asset.page_url,'Connection Error!')
+        except:
+            #download_success = False
+            print "Could not write", asset.page_file
+    return download_success
+
+def parse_search_results(search_file_name):
+    asset_list = []
+    result_soup = BS(open(search_file_name))
+    hrefs = result_soup.find_all(href=re.compile("asset"))
+    for result in hrefs:
+        result_nums = re.findall(r'\d+', str(result))
+        if len(result_nums[0]) > 4:
+            asset_list.append(result_nums[0])
+    return sorted(dedupe(asset_list))
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+    description='Search records at ANM and save results to a csv file. By default html search results and individual asset pages are also stored locally.')
+    parser.add_argument('--search_string', help='string to search')
+    parser.add_argument('--search_file_name', help='custom local filename for search file; default is "<search_string>.html"')
+    parser.add_argument("-l", "--local", help="process local files only, no search or download",action="store_true")
+    parser.add_argument("-u", "--unlimited", help="Do not limit to first 5,000 results",action="store_true")
+    parser.add_argument("-v", "--verbose", help="extra verbose output",action="store_true")
+    # MAYBE: parser.add_argument("-r", "--remote", help="do not save 
+    # search or asset pages locally")  
+    args = parser.parse_args()
+    return args
+
+def get_search_file_name(args):
+    if args.search_file_name == None:
+        if ".html" in args.search_string:
+            search_file_name = "./search_pages/"+args.search_string
+        else:
+            search_file_name = "./search_pages/"+args.search_string+".html"
+        if " " in search_file_name:
+            search_file_name = search_file_name.replace(" ","_")
+    else:
+        search_file_name = args.search_file_name
+    return search_file_name
+
+def search_needed(search_file_name, args):
+    if os.path.exists(search_file_name):
+       needed = False
+       print search_file_name, "found."
+    else:
+        needed = True
+        if args.local:
+            print "Search file not found in local mode. Cannot proceed. Run without -l to search via http."
+    return needed
+
+def do_search(search_file_name, args):
+    if args.verbose:
+        print "doing search"
+    if args.unlimited:
+        search_url = "http://ofa.arkib.gov.my/ofa/group/index?OfaSolr_page=1&pageSize=10000000000"
+    else:
+        search_url = "http://ofa.arkib.gov.my/ofa/group/index?OfaSolr_page=1&pageSize=5000"
+    query = "q="+(args.search_string.replace(" ","+"))
+    print "Posting search..."
+    try:
+        response = requests.post(search_url, data=query)
+        with open(target_file, "wb") as page:
+            page.write(response.text)
+    except requests.exceptions.Timeout:
+        print(search_file_name,'Timed Out!')
+    except requests.exceptions.ConnectionError:
+        print(search_file_name,'Connection Error!')
+    except:
+        print "Could not write", search_file_name
+    
+if __name__ == '__main__':
+    try:
+        __location__ = os.path.realpath(
+            os.path.join(os.getcwd(), os.path.dirname(__file__)))
+    except:
+        print "Running from", os.getcwd()
+    # 1) Ensure that we have a search string
+    args = parse_args()
+    print args
+    if args.search_string == None:
+        args.search_string = raw_input("Please enter a search string or path to a search results file: ")
+    # 2) Ensure that we have a local search page filename
+    search_file_name = get_search_file_name(args)
+    # 3) pull search page from the web if needed
+    if search_needed(search_file_name, args):
+        do_search(search_file_name, args)
+    # 4) parse the search results to get a list of asset numbers
+    asset_list = parse_search_results(search_file_name)
+    print asset_list
