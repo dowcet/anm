@@ -2,7 +2,7 @@ import os
 import re
 import urllib2
 import requests
-import json
+import csv
 from bs4 import BeautifulSoup as BS
 
 class anm_asset:
@@ -156,15 +156,32 @@ def process_search_page(search_url):
         else: 
             print "./pdf/" + str(asset.asset_no) + ".pdf already exists!"
 
-def dump_from_search(search_url):
+def dump_search_to_csv(search_url):
     asset_no_list = get_all_asset_nos(search_url)
-    # a list of dictionaries, each holding the metadata for an asset
-    asset_dict= {}
-    with open('assets.json', 'w') as outfile: 
-        json.dump([], outfile)
-    for asset_no in asset_no_list:
-        temp_asset = anm_asset(asset_no)
-        temp_dict = temp_asset.get_props() 
-        asset_dict[asset_no] = temp_dict
-    with open('assets.json', 'w') as dumpfile:    
-        json.dump(asset_dict, dumpfile)
+    with open('assets.csv', 'w') as outfile:
+        # 1) first write the column headings
+        # 1.a) this is not a good way to do this, but for a quick fix I am pasting the following dict from above 
+        target_keys_dict = {'Tajuk': 'title', 'No Penerimaan': 'request_num', 'Media Asal': 'media', 'Sumber': 'source', 'Tarikh': 'date', 'Jenis Rekod': 'rec_type', 'Kategori': 'cat', 'Subkategori': 'subcat', 'Lokasi': 'location', 'Deskripsi': 'description', 'Subjek': 'subject', 'Mukasurat Akses': 'access_page', 'Hit' : 'hits'}
+        # 1.b) translate this dict into a list, adding other columns before and after 
+        fieldnames = ["asset_no"]
+        for key in target_keys_dict:
+            fieldnames.append(target_keys_dict[key])
+        fieldnames.append('pdf_url')
+        # 1.c) finally write the column headings to the file
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
+        writer.writeheader()
+        # 2) now add each asset to the csv file
+        print "reading", len(asset_no_list), "asset files..."
+        for asset_no in asset_no_list:
+            # get props for asset
+            temp_asset = anm_asset(asset_no)
+            temp_prop_dict = temp_asset.get_props()
+            # include asset_no to dict
+            if "failure" in temp_prop_dict:
+                print "skipping asset", asset_no+":", temp_prop_dict["failure"]
+            else:
+                try:
+                    temp_prop_dict["asset_no"] = asset_no
+                    writer.writerow(temp_prop_dict)
+                except:
+                    raise # was: print asset_no, "failed!"
