@@ -76,18 +76,22 @@ class anm_asset:
         return props_dict
 
     def get_props(self):
+        props_dict = {}
         #print "getting properties..."
         # make sure we have the file, download if needed
         downloaded = self.download_page()
         # read the asset page file into BS
         if downloaded and os.path.exists(self.page_file):
-            print "reading", self.page_file
+            #print "reading", self.page_file
             self.page_soup = BS(open(self.page_file))
             try:
                 props_dict = self.parse_table_data()
             except:
                 print "could not parse table data!"
-                props_dict = "fail!"
+                props_dict["failure"] = "could not parse"
+        else:
+            print "could not find file!"
+            props_dict["failure"] = "file missing!"
         return props_dict
 
 ### end methods of anm_asset ###
