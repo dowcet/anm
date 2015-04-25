@@ -8,15 +8,116 @@ import requests
 import csv
 from bs4 import BeautifulSoup as BS
 
+class anm_search(object):
+    """Takes a search string and returns a list of ANM asset numbers with matches as 'self.assets'. It does this by posting a search via HTTP and/or parsing a local HTML file."""
+    def __init__(self, search_string, verbose = False, local_only = False, remote_only = False, filename = None, limit = "5000"):
+        # search string from user
+        self.search_string = search_string
+        # optional arguments in a dictionary
+        self.args = {"verbose": verbose, "local_only": local_only, "remote_only": remote_only, "filename": filename, "limit": limit}
+        # format search string to POST as data
+        self.query = "q="+(self.search_string.replace(" ","+"))
+        # set URL to POST to 
+        self.url = "http://ofa.arkib.gov.my/ofa/group/index?OfaSolr_page=1&pageSize="+self.args["limit"]
+        # set local filename for search file
+        self.filename = self.check_filename()
+        # check if we are going to POST a search or not
+        self.search_needed = self.check_if_search_needed()
+        # initialize attribute to hold search results as a 
+        # BeautifulSoup object
+        self.soup = None
+        # POST a search if needed, and then either a) save response 
+        # to a local HTML file or b) return the response as a 
+        # BS object  
+        if self.search_needed:
+            self.soup = self.do_search()
+        # if results were not just returned by do_search(), then read 
+        # them from the local file
+        if self.soup == None:
+            self.soup = BS(open(self.filename))
+        # get the asset list by parsing the BS object
+        self.__assets = self.parse_soup()
+
+    @property
+    def assets(self):
+        return self.__assets
+    
+    def check_filename(self):
+        """Sets a target filename for the search results if none given, based on the search string. Then offers to create directory if needed."""
+        target_folder = "./search_pages/"
+        # for now we will trust the user to enter a valid path if 
+        # they do not use the default filename
+        if not self.args["filename"] == None:
+            filename = self.args["filename"]
+        else:
+            filename = target_folder+self.search_string+".html"
+            # eliminate any spaces 
+            if " " in filename:
+                filename = filename.replace(" ","_")
+            # create corresponding folder if needed
+            if not os.path.exists(os.path.dirname(filename)):
+                do_it = raw_input(target_folder, "does not exist. Enter 'y' to create it:")
+                if do_it == 'y':
+                    os.makedirs(target_folder)
+        return filename
+
+    def check_if_search_needed(self):
+        """checks arguments and local files to see if search should be posted"""
+        if os.path.exists(self.filename):
+            needed = False
+            if self.args["verbose"]:
+                print search_file_name, "found."
+        else:
+            if self.args["local_only"]:
+                needed = False
+                print "Search file not found in local mode. Cannot proceed. Run without -l to search via http."
+            else:
+                needed = True
+        return needed
+
+    def do_search(self):
+        """ gets and optionally downloads the search results"""
+        if self.args["verbose"]:
+            print "Posting search to", self.url
+        else:
+            print "Searching..."
+        try:
+            response = requests.post(self.url, data=self.query, timeout=45)
+        except requests.exceptions.Timeout:
+            print(self.filename,'Timed Out!')
+        except requests.exceptions.ConnectionError:
+            print(self.filename,'Connection Error!')
+        if self.args["remote_only"]:
+            soup = BS(response.text)
+        else:
+            with open(self.filename, "wb") as page:
+                page.write(response.text)
+            soup = None
+        return soup
+
+    def parse_soup(self): 
+        """ gets the asset list from the search results using BeautifulSoup """
+        asset_list = []
+        hrefs = self.soup.find_all(href=re.compile("asset"))
+        for result in hrefs:
+            result_nums = re.findall(r'\d+', str(result))
+            if len(result_nums[0]) > 4:
+                asset_list.append(result_nums[0])
+        return sorted(dedupe(asset_list))
+
+    def dedupe(assets):
+        """ remove duplicates from list """
+        seen = set()
+        seen_add = seen.add
+        return [ x for x in assets if not (x in seen or seen_add(x))]
+
 class anm_asset:
     "A class to represent an asset found at http://ofa.arkib.gov.my"
     def __init__(self, asset_no):
         self.asset_no = asset_no
         self.page_url = "http://ofa.arkib.gov.my/ofa/group/asset/"+str(asset_no)
         self.page_file = "./asset_pages/"+str(asset_no)+".html"
-        # Currently using this dictionary for pdf_url only because I haven't figure out how to iterate a dictionary when it is an attribute 
-        self.props = {}
-
+        
 ### start methods of anm_asset ###
 
     def download_page(self):
@@ -99,7 +200,6 @@ class anm_asset:
         return props_dict
 
 ### end methods of anm_asset ###
-
 
 def pdf_check(asset):
     pdf_dest = "./pdf/" + str(asset.asset_no) + ".pdf"
@@ -220,54 +320,11 @@ def parse_args():
     parser.add_argument('--search_string', help='string to search')
     parser.add_argument('--search_file_name', help='custom local filename for search file; default is "<search_string>.html"')
     parser.add_argument("-l", "--local", help="process local files only, no search or download",action="store_true")
+    parser.add_argument("-r", "--remote", help="do not save any html files locally", action="store_true")
     parser.add_argument("-u", "--unlimited", help="Do not limit to first 5,000 results",action="store_true")
     parser.add_argument("-v", "--verbose", help="extra verbose output",action="store_true")
-    # MAYBE: parser.add_argument("-r", "--remote", help="do not save 
-    # search or asset pages locally")  
     args = parser.parse_args()
     return args
-
-def get_search_file_name(args):
-    if args.search_file_name == None:
-        if ".html" in args.search_string:
-            search_file_name = "./search_pages/"+args.search_string
-        else:
-            search_file_name = "./search_pages/"+args.search_string+".html"
-        if " " in search_file_name:
-            search_file_name = search_file_name.replace(" ","_")
-    else:
-        search_file_name = args.search_file_name
-    return search_file_name
-
-def search_needed(search_file_name, args):
-    if os.path.exists(search_file_name):
-       needed = False
-       print search_file_name, "found."
-    else:
-        needed = True
-        if args.local:
-            print "Search file not found in local mode. Cannot proceed. Run without -l to search via http."
-    return needed
-
-def do_search(search_file_name, args):
-    if args.verbose:
-        print "doing search"
-    if args.unlimited:
-        search_url = "http://ofa.arkib.gov.my/ofa/group/index?OfaSolr_page=1&pageSize=10000000000"
-    else:
-        search_url = "http://ofa.arkib.gov.my/ofa/group/index?OfaSolr_page=1&pageSize=5000"
-    query = "q="+(args.search_string.replace(" ","+"))
-    print "Posting search..."
-    try:
-        response = requests.post(search_url, data=query)
-        with open(target_file, "wb") as page:
-            page.write(response.text)
-    except requests.exceptions.Timeout:
-        print(search_file_name,'Timed Out!')
-    except requests.exceptions.ConnectionError:
-        print(search_file_name,'Connection Error!')
-    except:
-        print "Could not write", search_file_name
     
 if __name__ == '__main__':
     try:
@@ -279,12 +336,11 @@ if __name__ == '__main__':
     args = parse_args()
     print args
     if args.search_string == None:
-        args.search_string = raw_input("Please enter a search string or path to a search results file: ")
-    # 2) Ensure that we have a local search page filename
-    search_file_name = get_search_file_name(args)
-    # 3) pull search page from the web if needed
-    if search_needed(search_file_name, args):
-        do_search(search_file_name, args)
-    # 4) parse the search results to get a list of asset numbers
-    asset_list = parse_search_results(search_file_name)
-    print asset_list
+        search_string = raw_input("Please enter a search string or path to a search results file: ")
+    else:
+        search_string = args.search_string
+    # 2) get the asset list for the search string
+    asset_obj = anm_search(search_string)
+    asset_list = asset_obj.assets
+    for asset in asset_list:
+        print asset
