@@ -10,13 +10,14 @@ from bs4 import BeautifulSoup as BS
 
 class anm_search(object):
     """Takes a search string and returns a list of ANM asset numbers with matches as 'self.assets'. It does this by posting a search via HTTP and/or parsing a local HTML file."""
-    def __init__(self, search_string, verbose = False, local_only = False, remote_only = False, filename = None, limit = "5000"):
+    def __init__(self, search_string, verbose = False, local_only = False, remote_only = False, filename = None, limit = "1000"):
         # search string from user
         self.search_string = search_string
         # optional arguments in a dictionary
         self.args = {"verbose": verbose, "local_only": local_only, "remote_only": remote_only, "filename": filename, "limit": limit}
         # format search string to POST as data
-        self.query = "q="+(self.search_string.replace(" ","+"))
+        self.query = {'q': (self.search_string.replace(" ","+"))}
+        self.headers = {'content-type': 'application/x-www-form-urlencoded'}
         # set URL to POST to 
         self.url = "http://ofa.arkib.gov.my/ofa/group/index?OfaSolr_page=1&pageSize="+self.args["limit"]
         # set local filename for search file
@@ -66,7 +67,7 @@ class anm_search(object):
         if os.path.exists(self.filename):
             needed = False
             if self.args["verbose"]:
-                print search_file_name, "found."
+                print self.filename, "found."
         else:
             if self.args["local_only"]:
                 needed = False
@@ -77,22 +78,24 @@ class anm_search(object):
 
     def do_search(self):
         """ gets and optionally downloads the search results"""
-        if self.args["verbose"]:
-            print "Posting search to", self.url
-        else:
-            print "Searching..."
+        dl_ok = False
+        print "Searching..."
         try:
-            response = requests.post(self.url, data=self.query, timeout=45)
+            if self.args["verbose"]:
+                print "Posting search", self.query, "to", self.url
+            response = requests.post(self.url, data=self.query, headers=self.headers, timeout=30)
+            dl_ok = True
         except requests.exceptions.Timeout:
             print(self.filename,'Timed Out!')
         except requests.exceptions.ConnectionError:
             print(self.filename,'Connection Error!')
-        if self.args["remote_only"]:
+        if dl_ok and self.args["remote_only"]:
             soup = BS(response.text)
         else:
+            soup = None
+        if dl_ok:
             with open(self.filename, "wb") as page:
                 page.write(response.text)
-            soup = None
         return soup
 
     def parse_soup(self): 
@@ -340,7 +343,7 @@ if __name__ == '__main__':
     else:
         search_string = args.search_string
     # 2) get the asset list for the search string
-    asset_obj = anm_search(search_string)
+    asset_obj = anm_search(search_string, verbose = args.verbose)
     asset_list = asset_obj.assets
     for asset in asset_list:
         print asset
